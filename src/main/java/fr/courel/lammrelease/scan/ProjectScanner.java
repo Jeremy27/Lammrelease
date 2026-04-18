@@ -47,6 +47,7 @@ public final class ProjectScanner {
                 return java.util.Optional.empty();
             }
             String repo = new GitClient(dir).githubRepo();
+            boolean hasCi = CiDetector.hasTagTriggeredWorkflow(dir);
             return java.util.Optional.of(new LammProject(
                     dir.getFileName().toString(),
                     dir,
@@ -54,7 +55,8 @@ public final class ProjectScanner {
                     coords.groupId(),
                     coords.artifactId(),
                     version,
-                    repo
+                    repo,
+                    hasCi
             ));
         } catch (IOException e) {
             return java.util.Optional.empty();

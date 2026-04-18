@@ -120,7 +120,10 @@ public final class ReleaseScreen extends JPanel {
         card.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         for (var step : ReleaseStep.values()) {
-            var label = new JLabel("○  " + step.label());
+            boolean delegated = step == ReleaseStep.GITHUB_RELEASE && project.hasCiRelease();
+            var label = new JLabel(delegated
+                    ? "↗  " + step.label() + " (via CI)"
+                    : "○  " + step.label());
             label.setForeground(LammColors.textSecondary());
             label.setAlignmentX(Component.LEFT_ALIGNMENT);
             stepLabels.put(step, label);
@@ -166,8 +169,9 @@ public final class ReleaseScreen extends JPanel {
     private void launch() {
         launchBtn.setEnabled(false);
         logsArea.setText("");
-        stepLabels.forEach((_, l) -> {
-            l.setText("○  " + findStep(l).label());
+        stepLabels.forEach((step, l) -> {
+            boolean delegated = step == ReleaseStep.GITHUB_RELEASE && project.hasCiRelease();
+            l.setText(delegated ? "↗  " + step.label() + " (via CI)" : "○  " + step.label());
             l.setForeground(LammColors.textSecondary());
         });
 
@@ -223,9 +227,4 @@ public final class ReleaseScreen extends JPanel {
         return SwingUtilities.getWindowAncestor(this) instanceof JFrame f ? f : null;
     }
 
-    private ReleaseStep findStep(JLabel label) {
-        return stepLabels.entrySet().stream()
-                .filter(e -> e.getValue() == label)
-                .findFirst().map(Map.Entry::getKey).orElse(ReleaseStep.CHECK_CLEAN);
-    }
 }

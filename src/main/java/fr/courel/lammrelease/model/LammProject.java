@@ -9,7 +9,8 @@ public record LammProject(
         String groupId,
         String artifactId,
         SemVer version,
-        String githubRepo
+        String githubRepo,
+        boolean hasCiRelease
 ) {
     public Path targetDir() {
         return directory.resolve("target");

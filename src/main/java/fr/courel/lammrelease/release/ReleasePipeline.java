@@ -58,14 +58,19 @@ public final class ReleasePipeline {
             git.pushTag(plan.tag(), line -> logger.accept(ReleaseStep.PUSH, line));
         });
 
-        // 6. Release GitHub + upload assets (détectés APRÈS build)
-        step(listener, ReleaseStep.GITHUB_RELEASE, () -> {
-            List<Path> assets = AssetDetector.detect(project);
-            assets.forEach(a -> logger.accept(ReleaseStep.GITHUB_RELEASE, "asset: " + a));
-            var gh = new GitHubClient(dir);
-            gh.createRelease(plan.tag(), plan.releaseTitle(), plan.changelog(), assets,
-                    line -> logger.accept(ReleaseStep.GITHUB_RELEASE, line));
-        });
+        // 6. Release GitHub + upload assets (détectés APRÈS build) — sauf si la CI s'en charge
+        if (project.hasCiRelease()) {
+            listener.onEvent(ReleaseStep.GITHUB_RELEASE, Listener.Status.LOG,
+                    "Délégué au workflow GitHub Actions (déclenché par le push du tag)");
+        } else {
+            step(listener, ReleaseStep.GITHUB_RELEASE, () -> {
+                List<Path> assets = AssetDetector.detect(project);
+                assets.forEach(a -> logger.accept(ReleaseStep.GITHUB_RELEASE, "asset: " + a));
+                var gh = new GitHubClient(dir);
+                gh.createRelease(plan.tag(), plan.releaseTitle(), plan.changelog(), assets,
+                        line -> logger.accept(ReleaseStep.GITHUB_RELEASE, line));
+            });
+        }
     }
 
     private void step(Listener listener, ReleaseStep step, IoRunnable action) throws IOException {
