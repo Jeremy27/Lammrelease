@@ -5,7 +5,7 @@ Application desktop pour automatiser les releases des projets de la suite **Lamm
 ## Fonctionnalités
 
 - Scan du dossier de travail, détection automatique des projets `fr.courel/lamm*`
-- Affichage de la version locale + dernière release GitHub publiée
+- Affichage en tuiles avec version locale + dernière release GitHub publiée (fetch async)
 - Écran de release avec :
   - Choix du bump SemVer (Patch / Minor / Major)
   - Changelog pré-rempli depuis `git log` (commits depuis le dernier tag), éditable
@@ -22,7 +22,8 @@ Application desktop pour automatiser les releases des projets de la suite **Lamm
 ## Stack
 
 - Java 25
-- Swing + [LammUI](../LammUI)
+- JavaFX + [LammUI 2.0+](https://github.com/Jeremy27/LammUI)
+- Stage `UNDECORATED` avec chrome custom (`LammChromeFx`)
 - Aucune API REST maison : délégation à `git` et `gh` CLI
 
 ## Prérequis
@@ -31,7 +32,21 @@ Application desktop pour automatiser les releases des projets de la suite **Lamm
 - Maven 3.9+
 - `git` CLI
 - `gh` CLI [authentifié](https://cli.github.com/manual/gh_auth_login)
-- LammUI installé localement (`cd ../LammUI && mvn install`)
+- Accès à GitHub Packages pour tirer LammUI (cf. section ci-dessous)
+
+## Accès à LammUI depuis GitHub Packages
+
+LammUI est publiée sur `https://maven.pkg.github.com/Jeremy27/LammUI`. Maven a besoin d'un token pour la télécharger. Dans `~/.m2/settings.xml` :
+
+```xml
+<servers>
+  <server>
+    <id>github-lammui</id>
+    <username>YOUR_GITHUB_USERNAME</username>
+    <password>YOUR_PAT_WITH_READ_PACKAGES</password>
+  </server>
+</servers>
+```
 
 ## Build
 
@@ -47,7 +62,9 @@ java -jar target/lammrelease-X.Y.Z.jar
 
 ## Configuration
 
-Au premier lancement, le dossier de travail par défaut est `~/Documents/projets`. Modifiable via l'écran **Paramètres** et persisté dans `~/.config/lammrelease/config.properties`.
+Au premier lancement, le dossier de travail par défaut est `~/Documents/projets`. Modifiable via le menu **Configuration…** (cog en haut à droite) et persisté dans `~/.config/lammrelease/config.properties`.
+
+Les préférences UI (mode clair/sombre, accent) sont persistées via `java.util.prefs.Preferences`.
 
 ## Détection des assets uploadés sur la release
 
@@ -65,6 +82,7 @@ src/main/java/fr/courel/lammrelease/
 ├── scan/       # PomReader, ProjectScanner
 ├── process/    # GitClient, MavenRunner, GitHubClient (gh), ProcessRunner
 ├── release/    # ReleasePipeline, ReleasePlan, AssetDetector, ChangelogBuilder
-├── ui/         # MainScreen, ReleaseScreen, SettingsScreen, AppHeader
-└── App.java
+├── ui/         # MainScreen (tuiles), ReleaseScreen, SettingsScreen
+├── App.java    # Application JavaFX, navigateur de screens
+└── Main.java   # launcher (JavaFX 11+ refuse de démarrer une Application directement)
 ```
