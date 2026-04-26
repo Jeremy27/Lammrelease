@@ -4,115 +4,121 @@ import fr.courel.lammrelease.config.LammreleaseConfig;
 import fr.courel.lammrelease.model.LammProject;
 import fr.courel.lammrelease.process.GitHubClient;
 import fr.courel.lammrelease.scan.ProjectScanner;
-import fr.courel.lammui.component.LammButton;
-import fr.courel.lammui.component.LammCard;
-import fr.courel.lammui.component.LammLabel;
-import fr.courel.lammui.component.LammScrollPane;
-import fr.courel.lammui.theme.LammColors;
+import fr.courel.lammui.fx.component.LammButtonFx;
+import fr.courel.lammui.fx.component.LammCardFx;
+import javafx.application.Platform;
+import javafx.concurrent.Task;
+import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.control.Label;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.TilePane;
+import javafx.scene.layout.VBox;
 
-import javax.swing.*;
-import java.awt.*;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
-public final class MainScreen extends JPanel {
+public final class MainScreen extends VBox {
+
+    private static final double TILE_WIDTH = 320;
 
     private final LammreleaseConfig config;
     private final Navigator nav;
-    private final JPanel grid;
+    private final TilePane tiles;
+    private final Label hint;
+    private final Map<String, String> tagCache = new ConcurrentHashMap<>();
 
     public MainScreen(LammreleaseConfig config, Navigator nav) {
-        super(new BorderLayout(0, 0));
         this.config = config;
         this.nav = nav;
-        setOpaque(false);
-        setBorder(BorderFactory.createEmptyBorder(20, 32, 20, 32));
+        setSpacing(12);
+        setPadding(new Insets(20, 32, 20, 32));
 
-        add(topBar(), BorderLayout.NORTH);
+        hint = new Label();
+        var refresh = new LammButtonFx("Actualiser");
+        refresh.setOnAction(e -> refresh());
+        var spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+        var topBar = new HBox(8, hint, spacer, refresh);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        getChildren().add(topBar);
 
-        grid = new JPanel();
-        grid.setOpaque(false);
-        grid.setLayout(new BoxLayout(grid, BoxLayout.Y_AXIS));
-        add(new LammScrollPane(grid), BorderLayout.CENTER);
+        tiles = new TilePane(16, 16);
+        tiles.setPrefColumns(3);
+        tiles.setPrefTileWidth(TILE_WIDTH);
+        tiles.setTileAlignment(Pos.TOP_LEFT);
 
-        refresh();
-    }
-
-    private JPanel topBar() {
-        var bar = new JPanel(new BorderLayout());
-        bar.setOpaque(false);
-        bar.setBorder(BorderFactory.createEmptyBorder(0, 0, 12, 0));
-
-        var left = new LammLabel("Projets détectés dans " + config.workdir(), LammLabel.Style.CAPTION, true);
-        bar.add(left, BorderLayout.WEST);
-
-        var right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-        right.setOpaque(false);
-        var refresh = LammButton.flat("Actualiser");
-        refresh.addActionListener(_ -> refresh());
-        var settings = LammButton.flat("Paramètres");
-        settings.addActionListener(_ -> nav.showSettings());
-        right.add(refresh);
-        right.add(settings);
-        bar.add(right, BorderLayout.EAST);
-
-        return bar;
+        var scroll = new ScrollPane(tiles);
+        scroll.setFitToWidth(true);
+        VBox.setVgrow(scroll, Priority.ALWAYS);
+        getChildren().add(scroll);
     }
 
     public void refresh() {
-        grid.removeAll();
+        hint.setText("Projets détectés dans " + config.workdir());
+        tiles.getChildren().clear();
         List<LammProject> projects = new ProjectScanner().scan(config.workdir());
         if (projects.isEmpty()) {
-            var empty = new LammLabel("Aucun projet Lamm détecté dans ce dossier.",
-                    LammLabel.Style.BODY, true);
-            empty.setAlignmentX(Component.LEFT_ALIGNMENT);
-            grid.add(empty);
-        } else {
-            for (var p : projects) {
-                grid.add(projectCard(p));
-                grid.add(Box.createVerticalStrut(12));
-            }
+            tiles.getChildren().add(new Label("Aucun projet Lamm détecté dans ce dossier."));
+            return;
         }
-        grid.revalidate();
-        grid.repaint();
+        for (var p : projects) {
+            tiles.getChildren().add(buildTile(p));
+        }
     }
 
-    private JPanel projectCard(LammProject project) {
-        var card = new LammCard();
-        card.setLayout(new BorderLayout(16, 0));
-        card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 110));
-        card.setTitle(project.name());
+    private LammCardFx buildTile(LammProject project) {
+        var card = new LammCardFx(project.name());
+        card.setPrefWidth(TILE_WIDTH);
 
-        var infoCol = new JPanel();
-        infoCol.setOpaque(false);
-        infoCol.setLayout(new BoxLayout(infoCol, BoxLayout.Y_AXIS));
-        infoCol.add(new LammLabel("Version locale : " + project.version(), LammLabel.Style.BODY));
-
+        var versionLabel = new Label("Version locale : " + project.version());
         String remote = project.githubRepo() != null ? project.githubRepo() : "— (pas de remote GitHub)";
-        infoCol.add(new LammLabel("GitHub : " + remote, LammLabel.Style.CAPTION, true));
+        var githubLabel = new Label("GitHub : " + remote);
+        githubLabel.setWrapText(true);
+        String cached = tagCache.get(project.name());
+        var publishedLabel = new Label("Dernière release : " + (cached != null ? cached : "…"));
 
-        String published = fetchLatestReleaseTag(project);
-        infoCol.add(new LammLabel("Dernière release : " + (published != null ? published : "aucune"),
-                LammLabel.Style.CAPTION, true));
+        var info = new VBox(4, versionLabel, githubLabel, publishedLabel);
+        VBox.setVgrow(info, Priority.ALWAYS);
 
-        card.add(infoCol, BorderLayout.CENTER);
+        var releaseBtn = LammButtonFx.primary("Release");
+        releaseBtn.setDisable(project.githubRepo() == null);
+        releaseBtn.setOnAction(e -> nav.showRelease(project));
+        var actionRow = new HBox(releaseBtn);
+        actionRow.setAlignment(Pos.CENTER_RIGHT);
 
-        var actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
-        actions.setOpaque(false);
-        var releaseBtn = new LammButton("Release");
-        releaseBtn.setEnabled(project.githubRepo() != null);
-        releaseBtn.addActionListener(_ -> nav.showRelease(project));
-        actions.add(releaseBtn);
-        card.add(actions, BorderLayout.EAST);
+        card.getChildren().addAll(info, actionRow);
 
+        if (cached == null && project.githubRepo() != null) {
+            loadTagAsync(project, publishedLabel);
+        }
         return card;
     }
 
-    private String fetchLatestReleaseTag(LammProject project) {
-        if (project.githubRepo() == null) return null;
-        try {
-            return new GitHubClient(project.directory()).latestReleaseTag();
-        } catch (Exception e) {
-            return null;
-        }
+    private void loadTagAsync(LammProject project, Label label) {
+        var task = new Task<String>() {
+            @Override
+            protected String call() {
+                try {
+                    return new GitHubClient(project.directory()).latestReleaseTag();
+                } catch (Exception e) {
+                    return null;
+                }
+            }
+        };
+        task.setOnSucceeded(e -> {
+            String tag = task.getValue();
+            String display = tag != null ? tag : "aucune";
+            tagCache.put(project.name(), display);
+            label.setText("Dernière release : " + display);
+        });
+        task.setOnFailed(e -> Platform.runLater(() -> label.setText("Dernière release : —")));
+        var t = new Thread(task, "lammrelease-tag-fetch-" + project.name());
+        t.setDaemon(true);
+        t.start();
     }
 }

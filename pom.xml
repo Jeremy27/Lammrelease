@@ -13,13 +13,28 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <javafx.version>25</javafx.version>
     </properties>
+
+    <repositories>
+        <repository>
+            <id>github-lammui</id>
+            <url>https://maven.pkg.github.com/Jeremy27/LammUI</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+    </repositories>
 
     <dependencies>
         <dependency>
             <groupId>fr.courel</groupId>
             <artifactId>lammui</artifactId>
-            <version>1.1.0</version>
+            <version>2.0.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
         </dependency>
     </dependencies>
 
@@ -38,7 +53,7 @@
                         <configuration>
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>fr.courel.lammrelease.App</mainClass>
+                                    <mainClass>fr.courel.lammrelease.Main</mainClass>
                                 </transformer>
                             </transformers>
                             <filters>
